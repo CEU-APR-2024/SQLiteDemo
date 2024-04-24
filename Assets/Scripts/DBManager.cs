@@ -4,42 +4,72 @@ using UnityEngine;
 using Mono.Data.Sqlite;
 using System.Data;
 using System;
+using System.Data.Common;
+using System.Drawing;
 
 public class DBManager : MonoBehaviour
 {
     private string dbUri = "URI=file:mydb.sqlite";
     private string SQL_COUNT_ELEMNTS = "SELECT count(*) FROM Coches;";
-    private string SQL_CREATE = "CREATE TABLE IF NOT EXISTS Coches" +
+    private string SQL_CREATE_COCHES = "CREATE TABLE IF NOT EXISTS Coches" +
         "(Id INTEGER UNIQUE NOT NULL PRIMARY KEY" +
         ", Color TEXT NOT NULL" +
         ", Modelo TEXT DEFAULT 'Sandero'" +
-        ", Marca TEXT DEFAULT 'Dacia');";
+        ", Marca INTEGER REFERENCES Marcas);";
+    private string SQL_CREATE_MARCAS = "CREATE TABLE IF NOT EXISTS Marcas" +
+        "(Id INTEGER UNIQUE NOT NULL PRIMARY KEY" +
+        ", Nombre TEXT NOT NULL DEFAULT 'Dacia');";
     private string[] MARCAS = {"Dacia","Mercedes","Audi","Ferrari","Range","Bendi","Renault","Peugeot","Benly","Porsche"};
     private string[] MODELOS = {"Sandero","A4","Testarrosa","Q3","Q5","Velar","208","Clio","Megane","911"};
     private string[] COLORES = { "Negro", "Blanco", "Rojo", "Azul", "Rosa", "Morado", "Gris", "Marrón", "Verde", "Amarillo" };
-    private int NUM_DATA = 1000;
+    private int NUM_COCHES = 1000;
     // Start is called before the first frame update
     void Start()
     {
         Debug.Log("Start");
-        IDbConnection dbConnection = CreateAndOpenDatabase();
+        IDbConnection dbConnection = OpenDatabase();
+        InitializeDB(dbConnection);
         AddRandomData(dbConnection);
-
+        SearchByMarca(dbConnection,"Audi");
 
         dbConnection.Close();
         Debug.Log("End");
     }
 
-    private IDbConnection CreateAndOpenDatabase()
+    private void SearchByMarca(IDbConnection dbConnection, string marca)
+    {
+        IDbCommand dbCmd = dbConnection.CreateCommand();
+        dbCmd.CommandText = $"SELECT Id FROM Marcas WHERE Nombre='{marca}';";
+        IDataReader reader = dbCmd.ExecuteReader();
+        if (!reader.Read())
+        {
+            return;
+        }
+        int id_marca = reader.GetInt32(0);
+        reader.Close();
+
+        dbCmd.CommandText = $"SELECT * FROM Coches WHERE Marca='{id_marca}';";
+        reader = dbCmd.ExecuteReader();
+        string coches = "";
+        while(reader.Read())
+        {
+            coches += $"{reader.GetInt32(0)}, {reader.GetString(1)}, {reader.GetString(2)}\n";
+        }
+        Debug.Log(coches);
+    }
+
+    private IDbConnection OpenDatabase()
     {
         IDbConnection dbConnection = new SqliteConnection(dbUri);
         dbConnection.Open();
-
-        IDbCommand dbCmd = dbConnection.CreateCommand();
-        dbCmd.CommandText = SQL_CREATE;
-        dbCmd.ExecuteReader();
-
         return dbConnection;
+    }
+
+    private void InitializeDB(IDbConnection dbConnection)
+    {
+        IDbCommand dbCmd = dbConnection.CreateCommand();
+        dbCmd.CommandText = SQL_CREATE_MARCAS + SQL_CREATE_COCHES;
+        dbCmd.ExecuteReader();
     }
 
     private void AddRandomData(IDbConnection dbConnection)
@@ -48,18 +78,26 @@ public class DBManager : MonoBehaviour
         {
             return;
         }
-        string command = "INSERT INTO Coches (Color,Modelo,Marca) VALUES ";
+        int num_marcas = MARCAS.Length;
+        string command = "INSERT INTO Marcas (Nombre) VALUES ";
+        for (int i = 0; i < num_marcas; i++)
+        {
+            command += $"('{MARCAS[i]}'),";
+        }
+        command = command.Remove(command.Length - 1, 1);
+        command += ";";
+        command += "INSERT INTO Coches (Color,Modelo,Marca) VALUES ";
         System.Random rnd = new System.Random();
-        for (int i = 0; i < NUM_DATA; i++)
+        for (int i = 0; i < NUM_COCHES; i++)
         {
             string color = COLORES[rnd.Next(COLORES.Length)];
-            string modelo = MODELOS[rnd.Next(MODELOS.Length)]; 
-            string marca = MARCAS[rnd.Next(MARCAS.Length)];
+            string modelo = MODELOS[rnd.Next(MODELOS.Length)];
+            int marca = rnd.Next(num_marcas) + 1;
             command += $"('{color}','{modelo}','{marca}'),";
         }
         command = command.Remove(command.Length - 1, 1);
         command += ";";
-        Debug.Log(command);
+        //Debug.Log(command);
         IDbCommand dbCommand = dbConnection.CreateCommand();
         dbCommand.CommandText = command;
         dbCommand.ExecuteNonQuery();
