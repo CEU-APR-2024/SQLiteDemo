@@ -6,6 +6,7 @@ using System.Data;
 using System;
 using System.Data.Common;
 using System.Drawing;
+using Unity.VisualScripting.Dependencies.Sqlite;
 
 public class DBManager : MonoBehaviour
 {
@@ -30,6 +31,7 @@ public class DBManager : MonoBehaviour
         IDbConnection dbConnection = OpenDatabase();
         InitializeDB(dbConnection);
         AddRandomData(dbConnection);
+        //AddWrongData(dbConnection);
         SearchByMarca(dbConnection,"Audi");
 
         dbConnection.Close();
@@ -62,6 +64,9 @@ public class DBManager : MonoBehaviour
     {
         IDbConnection dbConnection = new SqliteConnection(dbUri);
         dbConnection.Open();
+        IDbCommand dbCommand = dbConnection.CreateCommand();
+        dbCommand.CommandText = "PRAGMA foreign_keys = ON";
+        dbCommand.ExecuteNonQuery();
         return dbConnection;
     }
 
@@ -70,6 +75,15 @@ public class DBManager : MonoBehaviour
         IDbCommand dbCmd = dbConnection.CreateCommand();
         dbCmd.CommandText = SQL_CREATE_MARCAS + SQL_CREATE_COCHES;
         dbCmd.ExecuteReader();
+    }
+
+    private void AddWrongData(IDbConnection dbConnection)
+    {
+        string command = "INSERT INTO Coches (Color,Modelo,Marca) VALUES ";
+        command += "('Rojo', '200', 201);";
+        IDbCommand dbCommand = dbConnection.CreateCommand();
+        dbCommand.CommandText = command;
+        dbCommand.ExecuteNonQuery();
     }
 
     private void AddRandomData(IDbConnection dbConnection)
